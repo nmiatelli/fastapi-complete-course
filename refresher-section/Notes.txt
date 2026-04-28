@@ -1,0 +1,6 @@
+SELF VS SUPER
+SELF is used to refer to the current object that is created or being instantiated, while SUPER is used to refer to the parent class
+
+SELF --> used when there is a need to differentiate between the instance variables and parameters with the same name
+
+SUPER --> used to call the parents methods and/ or constructors 
