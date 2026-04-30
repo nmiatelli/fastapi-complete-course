@@ -1,11 +1,12 @@
-from starlette import status
-
 import models
 from models import Todos
-from fastapi import FastAPI, Depends, HTTPException, Path
 from typing import Annotated
+from starlette import status
 from sqlalchemy.orm import Session
+from pydantic import BaseModel, Field
 from database import engine, SessionLocal
+from fastapi import FastAPI, Depends, HTTPException, Path
+
 
 app = FastAPI()
 
@@ -21,6 +22,12 @@ def get_db():
 
 db_dependency = Annotated[Session, Depends(get_db)] #dependency injection
 
+class TodoRequest(BaseModel):
+    title: str = Field(min_length=3)
+    description: str = Field(min_length=3, max_length=100)
+    priority: int = Field(gt=0, lt=6)
+    complete: bool
+
 @app.get("/", status_code=status.HTTP_200_OK)
 async def read_all(db: db_dependency):
     return db.query(Todos).all()
@@ -31,3 +38,35 @@ async def read_todo(db: db_dependency, todo_id:int = Path(gt=0)):
     if todo_model is not None:
         return todo_model
     raise HTTPException(status_code=404, detail="To do not found.")
+
+
+@app.post("/todo", status_code=status.HTTP_201_CREATED)
+async def create_todo(db: db_dependency, todo_request: TodoRequest):
+    todo_model =  Todos(**todo_request.model_dump())
+
+    db.add(todo_model)
+    db.commit()
+    
+
+@app.put("/todo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def update_todo(db: db_dependency, todo_request:TodoRequest, todo_id:int = Path(gt=6)):
+    todo_model = db.query(Todos).filter(Todos.id == todo_id).first()
+    if todo_model is not None:
+        raise HTTPException(status_code=404, detail="To do not found.")
+    
+    todo_model.title = todo_request.title # type: ignore
+    todo_model.description = todo_request.description # type: ignore
+    todo_model.priority = todo_request.priority # type: ignore
+    todo_model.complete = todo_request.complete # type: ignore
+
+    db.add(todo_model)
+    db.commit()
+    
+@app.delete("/todo/{todo_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_todo(db: db_dependency, todo_id: int = Path(gt=0)):
+    todo_model = db.query(Todos).filter(Todos.id == todo_id).first()
+    if todo_model is None:
+        raise HTTPException(status_code=404, detail="To do not found.")
+    db.query(Todos).filter(Todos.id == todo_id).delete()
+
+    db.commit()
